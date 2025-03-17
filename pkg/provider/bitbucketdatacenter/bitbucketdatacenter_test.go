@@ -14,14 +14,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jenkins-x/go-scm/scm"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params/info"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params/settings"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params/triggertype"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/provider"
 	bbtest "github.com/openshift-pipelines/pipelines-as-code/pkg/provider/bitbucketdatacenter/test"
-
-	bbv1 "github.com/gfleury/go-bitbucket-v1"
 	"go.uber.org/zap"
 	zapobserver "go.uber.org/zap/zaptest/observer"
 	"gotest.tools/v3/assert"
@@ -384,7 +383,7 @@ func TestGetCommitInfo(t *testing.T) {
 	tests := []struct {
 		name          string
 		event         *info.Event
-		commit        bbv1.Commit
+		commit        scm.Commit
 		defaultBranch string
 		latestCommit  string
 	}{
@@ -396,7 +395,7 @@ func TestGetCommitInfo(t *testing.T) {
 				SHA:          "sha",
 			},
 			defaultBranch: "branchmain",
-			commit: bbv1.Commit{
+			commit: scm.Commit{
 				Message: "hello moto",
 			},
 			latestCommit: "latestcommit",
@@ -406,11 +405,11 @@ func TestGetCommitInfo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, _ := rtesting.SetupFakeContext(t)
-			bbclient, _, mux, tearDown, tURL := bbtest.SetupBBDataCenterClient(ctx)
+			bbclient, scmClient, mux, tearDown, tURL := bbtest.SetupBBDataCenterClient(ctx)
 			bbtest.MuxCommitInfo(t, mux, tt.event, tt.commit)
 			bbtest.MuxDefaultBranch(t, mux, tt.event, tt.defaultBranch, tt.latestCommit)
 			defer tearDown()
-			v := &Provider{Client: bbclient, baseURL: tURL, projectKey: tt.event.Organization}
+			v := &Provider{Client: bbclient, ScmClient: scmClient, baseURL: tURL, projectKey: tt.event.Organization}
 			err := v.GetCommitInfo(ctx, tt.event)
 			assert.NilError(t, err)
 			assert.Equal(t, tt.defaultBranch, tt.event.DefaultBranch)
