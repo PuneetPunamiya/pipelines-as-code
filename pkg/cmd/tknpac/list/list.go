@@ -23,10 +23,11 @@ import (
 var lsTmpl string
 
 var (
-	allNamespacesFlag = "all-namespaces"
-	namespaceFlag     = "namespace"
-	useRealTimeFlag   = "use-realtime"
-	noHeadersFlag     = "no-headers"
+	allNamespacesFlag         = "all-namespaces"
+	namespaceFlag             = "namespace"
+	useRealTimeFlag           = "use-realtime"
+	noHeadersFlag             = "no-headers"
+	consoleIsnotConfiguredURL = "https://dashboard.is.not.configured"
 )
 
 func Root(run *params.Run, ioStreams *cli.IOStreams) *cobra.Command {
@@ -125,6 +126,10 @@ func formatStatus(status *v1alpha1.RepositoryRunStatus, cs *cli.ColorScheme, c c
 	reason := "UNKNOWN"
 	if len(status.Status.Conditions) > 0 {
 		reason = status.Status.Conditions[0].Reason
+	}
+
+	if *status.LogURL == consoleIsnotConfiguredURL {
+		return fmt.Sprintf("%s\t%s", s, cs.ColorStatus(reason))
 	}
 	return fmt.Sprintf("%s\t%s", s, cs.HyperLink(cs.ColorStatus(reason), *status.LogURL))
 }
