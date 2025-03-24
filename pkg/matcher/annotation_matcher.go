@@ -10,7 +10,9 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/apis/pipelinesascode"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/apis/pipelinesascode/keys"
+	"github.com/openshift-pipelines/pipelines-as-code/pkg/apis/pipelinesascode/v1alpha1"
 	apipac "github.com/openshift-pipelines/pipelines-as-code/pkg/apis/pipelinesascode/v1alpha1"
+	"github.com/openshift-pipelines/pipelines-as-code/pkg/events"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/opscomments"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params/info"
@@ -149,7 +151,7 @@ func getName(prun *tektonv1.PipelineRun) string {
 	return name
 }
 
-func MatchPipelinerunByAnnotation(ctx context.Context, logger *zap.SugaredLogger, pruns []*tektonv1.PipelineRun, cs *params.Run, event *info.Event, vcx provider.Interface) ([]Match, error) {
+func MatchPipelinerunByAnnotation(ctx context.Context, logger *zap.SugaredLogger, pruns []*tektonv1.PipelineRun, cs *params.Run, event *info.Event, vcx provider.Interface, eventEmitter *events.EventEmitter, repo *v1alpha1.Repository) ([]Match, error) {
 	matchedPRs := []Match{}
 	infomsg := fmt.Sprintf("matching pipelineruns to event: URL=%s, target-branch=%s, source-branch=%s, target-event=%s",
 		event.URL,
@@ -226,6 +228,23 @@ func MatchPipelinerunByAnnotation(ctx context.Context, logger *zap.SugaredLogger
 		if event.EventType == opscomments.NoOpsCommentEventType.String() || event.EventType == opscomments.OnCommentEventType.String() {
 			continue
 		}
+
+		if prun.GetObjectMeta().GetAnnotations()[keys.OnCelExpression] != "" {
+			if prun.GetObjectMeta().GetAnnotations()[keys.OnEvent] != "" && prun.GetObjectMeta().GetAnnotations()[keys.OnTargetBranch] != "" {
+				msg := fmt.Sprintf("Warning: The PipelineRun '%s' has both `on-cel-expression` and `on-event`/`on-target-branch` annotations. The `on-cel-expression` will take precedence, and the other annotations will be ignored.", prun.Name)
+				logger.Warnf(msg)
+				eventEmitter.EmitMessage(repo, zap.WarnLevel, "RepositoryCannotLocatePipelineRun", msg)
+			} else if prun.GetObjectMeta().GetAnnotations()[keys.OnEvent] != "" {
+				msg := fmt.Sprintf("Warning: The PipelineRun '%s' has both `on-cel-expression` and `on-event` annotations. The `on-cel-expression` will take precedence, and the `on-event` annotation will be ignored.", prun.Name)
+				logger.Warnf(msg)
+				eventEmitter.EmitMessage(repo, zap.WarnLevel, "RespositoryTakesOnCelExpressionPrecedence", msg)
+			} else if prun.GetObjectMeta().GetAnnotations()[keys.OnTargetBranch] != "" {
+				msg := fmt.Sprintf("Warning: The PipelineRun '%s' has both `on-cel-expression` and `on-target-branch` annotations. The `on-cel-expression` will take precedence, and the `on-target-branch` annotation will be ignored.", prun.Name)
+				logger.Warnf(msg)
+				eventEmitter.EmitMessage(repo, zap.WarnLevel, "RespositoryTakesOnCelExpressionPrecedence", msg)
+			}
+		}
+
 		if celExpr, ok := prun.GetObjectMeta().GetAnnotations()[keys.OnCelExpression]; ok {
 			out, err := celEvaluate(ctx, celExpr, event, vcx)
 			if err != nil {
