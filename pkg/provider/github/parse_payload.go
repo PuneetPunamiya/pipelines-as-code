@@ -259,6 +259,13 @@ func (v *Provider) processEvent(ctx context.Context, event *info.Event, eventInt
 		if gitEvent.GetRepo() == nil {
 			return nil, errors.New("error parsing payload the repository should not be nil")
 		}
+
+		if gitEvent.After != nil {
+			if isZeroSHA(*gitEvent.After) {
+				return nil, fmt.Errorf("branch %s has been deleted, exiting", gitEvent.GetRef())
+			}
+		}
+
 		processedEvent.Organization = gitEvent.GetRepo().GetOwner().GetLogin()
 		processedEvent.Repository = gitEvent.GetRepo().GetName()
 		processedEvent.DefaultBranch = gitEvent.GetRepo().GetDefaultBranch()
@@ -324,6 +331,10 @@ func (v *Provider) processEvent(ctx context.Context, event *info.Event, eventInt
 	processedEvent.Provider.Token = event.Provider.Token
 
 	return processedEvent, nil
+}
+
+func isZeroSHA(sha string) bool {
+	return sha == "0000000000000000000000000000000000000000"
 }
 
 func (v *Provider) handleReRequestEvent(ctx context.Context, event *github.CheckRunEvent) (*info.Event, error) {
