@@ -40,6 +40,19 @@ func UntilMinPRAppeared(ctx context.Context, clients clients.Clients, opts Opts,
 	})
 }
 
+func UpdateRepo(ctx context.Context, clients clients.Clients, opts Opts) error {
+	repo, err := clients.PipelineAsCode.PipelinesascodeV1alpha1().Repositories(opts.Namespace).Get(ctx, opts.RepoName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	repo.Spec.Settings = nil
+	if _, err := clients.PipelineAsCode.PipelinesascodeV1alpha1().Repositories(opts.Namespace).Update(ctx, repo, metav1.UpdateOptions{}); err != nil {
+		return err
+	}
+	return nil
+}
+
 func UntilRepositoryUpdated(ctx context.Context, clients clients.Clients, opts Opts) (*pacv1alpha1.Repository, error) {
 	ctx, cancel := context.WithTimeout(ctx, opts.PollTimeout)
 	defer cancel()

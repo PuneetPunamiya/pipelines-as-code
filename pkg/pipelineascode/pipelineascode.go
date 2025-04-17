@@ -55,6 +55,18 @@ func NewPacs(event *info.Event, vcx provider.Interface, run *params.Run, pacInfo
 	}
 }
 
+func disableCommentOnGitlabMR(repo *v1alpha1.Repository) string {
+	disableCommentOnGitlabMR := ""
+	if repo == nil {
+		return disableCommentOnGitlabMR
+	}
+
+	if repo.Spec.Settings != nil {
+		disableCommentOnGitlabMR = repo.Spec.Settings.Gitlab.CommentStrategy
+	}
+	return disableCommentOnGitlabMR
+}
+
 func (p *PacRun) Run(ctx context.Context) error {
 	matchedPRs, repo, err := p.matchRepoPR(ctx)
 	if repo != nil && p.event.TriggerTarget == triggertype.PullRequestClosed {
@@ -65,10 +77,11 @@ func (p *PacRun) Run(ctx context.Context) error {
 	}
 	if err != nil {
 		createStatusErr := p.vcx.CreateStatus(ctx, p.event, provider.StatusOpts{
-			Status:     CompletedStatus,
-			Conclusion: failureConclusion,
-			Text:       fmt.Sprintf("There was an issue validating the commit: %q", err),
-			DetailsURL: p.run.Clients.ConsoleUI().URL(),
+			Status:                    CompletedStatus,
+			Conclusion:                failureConclusion,
+			Text:                      fmt.Sprintf("There was an issue validating the commit: %q", err),
+			DetailsURL:                p.run.Clients.ConsoleUI().URL(),
+			DisableMRCommentsOnGitlab: disableCommentOnGitlabMR(repo),
 		})
 		p.eventEmitter.EmitMessage(repo, zap.ErrorLevel, "RepositoryCreateStatus", fmt.Sprintf("an error occurred: %s", err))
 		if createStatusErr != nil {
@@ -113,11 +126,12 @@ func (p *PacRun) Run(ctx context.Context) error {
 				errMsgM := fmt.Sprintf("There was an error creating the PipelineRun: <b>%s</b>\n\n%s", match.PipelineRun.GetGenerateName(), err.Error())
 				p.eventEmitter.EmitMessage(repo, zap.ErrorLevel, "RepositoryPipelineRun", errMsg)
 				createStatusErr := p.vcx.CreateStatus(ctx, p.event, provider.StatusOpts{
-					Status:                   CompletedStatus,
-					Conclusion:               failureConclusion,
-					Text:                     errMsgM,
-					DetailsURL:               p.run.Clients.ConsoleUI().URL(),
-					InstanceCountForCheckRun: i,
+					Status:                    CompletedStatus,
+					Conclusion:                failureConclusion,
+					Text:                      errMsgM,
+					DetailsURL:                p.run.Clients.ConsoleUI().URL(),
+					InstanceCountForCheckRun:  i,
+					DisableMRCommentsOnGitlab: disableCommentOnGitlabMR(repo),
 				})
 				if createStatusErr != nil {
 					p.eventEmitter.EmitMessage(repo, zap.ErrorLevel, "RepositoryCreateStatus", fmt.Sprintf("Cannot create status: %s: %s", err, createStatusErr))
@@ -232,13 +246,14 @@ func (p *PacRun) startPR(ctx context.Context, match matcher.Match) (*tektonv1.Pi
 		return nil, fmt.Errorf("cannot create message template: %w", err)
 	}
 	status := provider.StatusOpts{
-		Status:                  inProgressStatus,
-		Conclusion:              pendingConclusion,
-		Text:                    msg,
-		DetailsURL:              consoleURL,
-		PipelineRunName:         pr.GetName(),
-		PipelineRun:             pr,
-		OriginalPipelineRunName: pr.GetAnnotations()[keys.OriginalPRName],
+		Status:                    inProgressStatus,
+		Conclusion:                pendingConclusion,
+		Text:                      msg,
+		DetailsURL:                consoleURL,
+		PipelineRunName:           pr.GetName(),
+		PipelineRun:               pr,
+		OriginalPipelineRunName:   pr.GetAnnotations()[keys.OriginalPRName],
+		DisableMRCommentsOnGitlab: disableCommentOnGitlabMR(match.Repo),
 	}
 
 	// if pipelineRun is in pending state then report status as queued

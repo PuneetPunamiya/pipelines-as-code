@@ -179,7 +179,7 @@ func (r *Reconciler) reportFinalStatus(ctx context.Context, logger *zap.SugaredL
 	}
 
 	finalState := kubeinteraction.StateCompleted
-	newPr, err := r.postFinalStatus(ctx, logger, pacInfo, provider, event, pr)
+	newPr, err := r.postFinalStatus(ctx, logger, pacInfo, provider, event, pr, repo)
 	if err != nil {
 		logger.Errorf("failed to post final status, moving on: %v", err)
 		finalState = kubeinteraction.StateFailed

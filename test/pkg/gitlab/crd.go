@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CreateCRD(ctx context.Context, projectinfo *gitlab.Project, run *params.Run, targetNS string, incomings *[]v1alpha1.Incoming) error {
+func CreateCRD(ctx context.Context, projectinfo *gitlab.Project, run *params.Run, targetNS string, incomings *[]v1alpha1.Incoming, settings *v1alpha1.Settings) error {
 	if err := pacrepo.CreateNS(ctx, targetNS, run); err != nil {
 		return err
 	}
@@ -31,7 +31,8 @@ func CreateCRD(ctx context.Context, projectinfo *gitlab.Project, run *params.Run
 			Name: targetNS,
 		},
 		Spec: v1alpha1.RepositorySpec{
-			URL: projectinfo.WebURL,
+			Settings: settings,
+			URL:      projectinfo.WebURL,
 			GitProvider: &v1alpha1.GitProvider{
 				Type:          "gitlab",
 				URL:           apiURL,
