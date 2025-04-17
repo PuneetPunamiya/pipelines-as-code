@@ -237,12 +237,16 @@ func (v *Provider) CreateStatus(_ context.Context, event *info.Event, statusOpts
 	if event.TriggerTarget == triggertype.PullRequest && opscomments.IsAnyOpsEventType(event.EventType) {
 		eventType = triggertype.PullRequest
 	}
-	// only add a note when we are on a MR
-	if eventType == triggertype.PullRequest || provider.Valid(event.EventType, anyMergeRequestEventType) {
-		mopt := &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.Ptr(body)}
-		_, _, err := v.Client.Notes.CreateMergeRequestNote(event.TargetProjectID, event.PullRequestNumber, mopt)
-		return err
+
+	if statusOpts.DisableMRCommentsOnGitlab != "disable-all" {
+		// only add a note when we are on a MR
+		if eventType == triggertype.PullRequest || provider.Valid(event.EventType, anyMergeRequestEventType) {
+			mopt := &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.Ptr(body)}
+			_, _, err := v.Client.Notes.CreateMergeRequestNote(event.TargetProjectID, event.PullRequestNumber, mopt)
+			return err
+		}
 	}
+
 	return nil
 }
 

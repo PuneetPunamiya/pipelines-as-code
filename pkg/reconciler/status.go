@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/go-github/v70/github"
 	apipac "github.com/openshift-pipelines/pipelines-as-code/pkg/apis/pipelinesascode/keys"
+	"github.com/openshift-pipelines/pipelines-as-code/pkg/apis/pipelinesascode/v1alpha1"
 	pacv1a1 "github.com/openshift-pipelines/pipelines-as-code/pkg/apis/pipelinesascode/v1alpha1"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/formatting"
 	kstatus "github.com/openshift-pipelines/pipelines-as-code/pkg/kubeinteraction/status"
@@ -97,7 +98,7 @@ func (r *Reconciler) getFailureSnippet(ctx context.Context, pr *tektonv1.Pipelin
 	return fmt.Sprintf("task <b>%s</b> has the status <b>\"%s\"</b>:\n<pre>%s</pre>", name, sortedTaskInfos[0].Reason, text)
 }
 
-func (r *Reconciler) postFinalStatus(ctx context.Context, logger *zap.SugaredLogger, pacInfo *info.PacOpts, vcx provider.Interface, event *info.Event, createdPR *tektonv1.PipelineRun) (*tektonv1.PipelineRun, error) {
+func (r *Reconciler) postFinalStatus(ctx context.Context, logger *zap.SugaredLogger, pacInfo *info.PacOpts, vcx provider.Interface, event *info.Event, createdPR *tektonv1.PipelineRun, repo *v1alpha1.Repository) (*tektonv1.PipelineRun, error) {
 	pr, err := r.run.Clients.Tekton.TektonV1().PipelineRuns(createdPR.GetNamespace()).Get(
 		ctx, createdPR.GetName(), metav1.GetOptions{},
 	)
@@ -142,14 +143,20 @@ func (r *Reconciler) postFinalStatus(ctx context.Context, logger *zap.SugaredLog
 		return nil, fmt.Errorf("cannot create message template: %w", err)
 	}
 
+	disableComments := ""
+	if repo.Spec.Settings != nil {
+		disableComments = repo.Spec.Settings.Gitlab.DisableGitlabCommentMRStrategy
+	}
+
 	status := provider.StatusOpts{
-		Status:                  pipelineascode.CompletedStatus,
-		PipelineRun:             pr,
-		Conclusion:              formatting.PipelineRunStatus(pr),
-		Text:                    tmplStatusText,
-		PipelineRunName:         pr.Name,
-		DetailsURL:              r.run.Clients.ConsoleUI().DetailURL(pr),
-		OriginalPipelineRunName: pr.GetAnnotations()[apipac.OriginalPRName],
+		Status:                    pipelineascode.CompletedStatus,
+		PipelineRun:               pr,
+		Conclusion:                formatting.PipelineRunStatus(pr),
+		Text:                      tmplStatusText,
+		PipelineRunName:           pr.Name,
+		DetailsURL:                r.run.Clients.ConsoleUI().DetailURL(pr),
+		OriginalPipelineRunName:   pr.GetAnnotations()[apipac.OriginalPRName],
+		DisableMRCommentsOnGitlab: disableComments,
 	}
 
 	err = createStatusWithRetry(ctx, logger, vcx, event, status)

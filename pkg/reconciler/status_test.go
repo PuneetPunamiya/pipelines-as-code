@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jonboulle/clockwork"
+	"github.com/openshift-pipelines/pipelines-as-code/pkg/apis/pipelinesascode/v1alpha1"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/consoleui"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params/clients"
@@ -70,6 +71,16 @@ func TestPostFinalStatus(t *testing.T) {
 			ErrorLogSnippet: false,
 		},
 	}
-	_, err := r.postFinalStatus(ctx, fakelogger, pacInfo, vcx, info.NewEvent(), pr1)
+
+	repo := v1alpha1.Repository{
+		Spec: v1alpha1.RepositorySpec{
+			Settings: &v1alpha1.Settings{
+				Gitlab: &v1alpha1.GitlabSettings{
+					DisableGitlabCommentMRStrategy: "",
+				},
+			},
+		},
+	}
+	_, err := r.postFinalStatus(ctx, fakelogger, pacInfo, vcx, info.NewEvent(), pr1, &repo)
 	assert.NilError(t, err)
 }

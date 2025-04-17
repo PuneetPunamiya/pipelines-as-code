@@ -14,17 +14,18 @@ import (
 )
 
 type StatusOpts struct {
-	PipelineRun              *v1.PipelineRun
-	PipelineRunName          string
-	OriginalPipelineRunName  string
-	Status                   string
-	Conclusion               string
-	Text                     string
-	DetailsURL               string
-	Summary                  string
-	Title                    string
-	InstanceCountForCheckRun int
-	AccessDenied             bool
+	PipelineRun               *v1.PipelineRun
+	PipelineRunName           string
+	OriginalPipelineRunName   string
+	Status                    string
+	Conclusion                string
+	Text                      string
+	DetailsURL                string
+	Summary                   string
+	Title                     string
+	InstanceCountForCheckRun  int
+	AccessDenied              bool
+	DisableMRCommentsOnGitlab string
 }
 
 type Interface interface {
