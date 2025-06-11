@@ -38,6 +38,12 @@ func (v *Provider) Detect(req *http.Request, payload string, logger *zap.Sugared
 
 	switch gitEvent := eventInt.(type) {
 	case *gitlab.MergeEvent:
+		if gitEvent.ObjectAttributes.Action == "update" && gitEvent.ObjectAttributes.OldRev == "" {
+			if !hasOnlyUpdatedAtOrLabelsChanged(gitEvent) {
+				return setLoggerAndProceed(false, fmt.Sprint("it's a merge event but has other changes"), nil)
+			}
+		}
+
 		if provider.Valid(gitEvent.ObjectAttributes.Action, []string{"open", "reopen", "update"}) {
 			return setLoggerAndProceed(true, "", nil)
 		}
@@ -75,4 +81,31 @@ func (v *Provider) Detect(req *http.Request, payload string, logger *zap.Sugared
 	default:
 		return setLoggerAndProceed(false, "", fmt.Errorf("gitlab: event \"%s\" is not supported", event))
 	}
+}
+
+func hasOnlyUpdatedAtOrLabelsChanged(gitEvent *gitlab.MergeEvent) bool {
+	changes := gitEvent.Changes
+
+	updatedAtChanged := changes.UpdatedAt.Previous != "" || changes.UpdatedAt.Current != ""
+	labelsChanged := len(changes.Labels.Previous) > 0 || len(changes.Labels.Current) > 0
+
+	// Only UpdatedAt or Labels can change — everything else must be zero or nil
+	onlyUpdatedAtOrLabels := (updatedAtChanged || labelsChanged) &&
+		changes.Assignees.Previous == nil && changes.Assignees.Current == nil &&
+		changes.Reviewers.Previous == nil && changes.Reviewers.Current == nil &&
+		changes.Description.Previous == "" && changes.Description.Current == "" &&
+		!changes.Draft.Previous && !changes.Draft.Current &&
+		changes.LastEditedAt.Previous == "" && changes.LastEditedAt.Current == "" &&
+		changes.LastEditedByID.Previous == 0 && changes.LastEditedByID.Current == 0 &&
+		changes.MergeStatus.Previous == "" && changes.MergeStatus.Current == "" &&
+		changes.MilestoneID.Previous == 0 && changes.MilestoneID.Current == 0 &&
+		changes.SourceBranch.Previous == "" && changes.SourceBranch.Current == "" &&
+		changes.SourceProjectID.Previous == 0 && changes.SourceProjectID.Current == 0 &&
+		changes.StateID.Previous == 0 && changes.StateID.Current == 0 &&
+		changes.TargetBranch.Previous == "" && changes.TargetBranch.Current == "" &&
+		changes.TargetProjectID.Previous == 0 && changes.TargetProjectID.Current == 0 &&
+		changes.Title.Previous == "" && changes.Title.Current == "" &&
+		changes.UpdatedByID.Previous == 0 && changes.UpdatedByID.Current == 0
+
+	return onlyUpdatedAtOrLabels
 }
